@@ -34,7 +34,7 @@ jobs:
 
   build-osx-arm64:
     name: Build osx-arm64
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
 
