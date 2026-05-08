@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <Version>1.0.3</Version>
+        <TargetFramework>netstandard2.0</TargetFramework>
+        <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageLicenseExpression>LGPL-2.0-or-later</PackageLicenseExpression>
+        <Description>OpenAL Soft v1.25.1 binaries for win-x64, linux-x64 and osx-arm64</Description>
+        <RepositoryType>git</RepositoryType>
+        <RepositoryUrl>https://github.com/kcat/openal-soft</RepositoryUrl>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <None Include="README.md" Pack="true" PackagePath="\" />
+        <Content Include="runtimes\**" PackagePath="runtimes" Visible="false" />
+    </ItemGroup>
+
+</Project>

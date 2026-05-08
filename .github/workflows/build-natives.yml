@@ -1,0 +1,115 @@
+name: Build native artifacts
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  build-win-linux:
+    name: Build win-x64 + linux-x64
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build (cross-compile Windows DLL, native Linux .so)
+        run: bash scripts/build-win64-linux64.sh
+
+      - name: Upload win-x64
+        uses: actions/upload-artifact@v4
+        with:
+          name: win-x64
+          path: ~/build-artifacts/runtimes/win-x64
+          if-no-files-found: error
+
+      - name: Upload linux-x64
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-x64
+          path: ~/build-artifacts/runtimes/linux-x64
+          if-no-files-found: error
+
+  build-osx-arm64:
+    name: Build osx-arm64
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build (native Apple Silicon dylib)
+        run: bash scripts/build-osx-arm64.sh
+
+      - name: Upload osx-arm64
+        uses: actions/upload-artifact@v4
+        with:
+          name: osx-arm64
+          path: ~/build-artifacts/runtimes/osx-arm64
+          if-no-files-found: error
+
+  pack:
+    name: Pack NuGet package
+    needs: [build-win-linux, build-osx-arm64]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Stage fresh native artifacts
+        run: |
+          rm -rf runtimes/win-x64 runtimes/linux-x64 runtimes/osx-arm64
+
+      - name: Download win-x64
+        uses: actions/download-artifact@v4
+        with:
+          name: win-x64
+          path: runtimes/win-x64
+
+      - name: Download linux-x64
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-x64
+          path: runtimes/linux-x64
+
+      - name: Download osx-arm64
+        uses: actions/download-artifact@v4
+        with:
+          name: osx-arm64
+          path: runtimes/osx-arm64
+
+      - name: Show artifact layout & sizes
+        run: find runtimes -type f -exec ls -lh {} +
+
+      - name: Verify tag matches csproj version (tag pushes only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          TAG_VERSION="${GITHUB_REF#refs/tags/v}"
+          CSPROJ_VERSION=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' Rombadil.OpenAL.Soft.Native.csproj)
+          echo "Tag version:    $TAG_VERSION"
+          echo "csproj version: $CSPROJ_VERSION"
+          if [ "$TAG_VERSION" != "$CSPROJ_VERSION" ]; then
+            echo "::error::Tag v$TAG_VERSION does not match <Version>$CSPROJ_VERSION</Version> in the csproj. Bump the csproj before tagging."
+            exit 1
+          fi
+
+      - name: Pack (GeneratePackageOnBuild produces the .nupkg)
+        run: dotnet build -c Release
+
+      - name: Upload .nupkg
+        uses: actions/upload-artifact@v4
+        with:
+          name: nupkg
+          path: bin/Release/*.nupkg
+          if-no-files-found: error
+
+      - name: Publish to NuGet.org (tag pushes only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: >-
+          dotnet nuget push bin/Release/*.nupkg
+          --api-key "${{ secrets.NUGET_API_KEY }}"
+          --source https://api.nuget.org/v3/index.json
+          --skip-duplicate
