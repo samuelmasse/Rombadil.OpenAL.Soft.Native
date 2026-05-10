@@ -26,6 +26,8 @@ TARBALL_URL="https://github.com/kcat/openal-soft/archive/refs/tags/${OPENAL_VERS
 WORK_DIR="$HOME/openal-build"
 OUT_DIR="$HOME/build-artifacts/runtimes"
 SRC_DIR="$WORK_DIR/openal-soft-${OPENAL_VERSION}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PATCH_FILE="$SCRIPT_DIR/openal-bake-defaults.patch"
 OSX_ARCH="arm64"
 OSX_DEPLOYMENT_TARGET="11.0"  # First arm64-supporting macOS
 
@@ -83,6 +85,19 @@ else
     curl -fsSL -o "openal-soft-${OPENAL_VERSION}.tar.gz" "$TARBALL_URL"
     tar xf "openal-soft-${OPENAL_VERSION}.tar.gz"
     note "Extracted to $SRC_DIR"
+fi
+
+# Bake [general] defaults (channels=mono, frequency=44100, resampler=point)
+# into the dylib so the runtime doesn't need an alsoft.ini next to the binary.
+# Marker file makes this idempotent across re-runs that reuse $SRC_DIR.
+PATCH_MARKER="$SRC_DIR/.rombadil-defaults-patched"
+if [[ ! -f "$PATCH_MARKER" ]]; then
+    note "Applying $PATCH_FILE..."
+    ( cd "$SRC_DIR" && patch -p1 < "$PATCH_FILE" )
+    touch "$PATCH_MARKER"
+    ok "Patch applied."
+else
+    note "Patch already applied to $SRC_DIR — skipping."
 fi
 ok "Source ready."
 

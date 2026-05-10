@@ -26,6 +26,8 @@ TARBALL_URL="https://github.com/kcat/openal-soft/archive/refs/tags/${OPENAL_VERS
 WORK_DIR="$HOME/openal-build"
 OUT_DIR="$HOME/build-artifacts/runtimes"
 SRC_DIR="$WORK_DIR/openal-soft-${OPENAL_VERSION}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PATCH_FILE="$SCRIPT_DIR/openal-bake-defaults.patch"
 
 # ---- Pretty output ----
 B=$'\033[1m'; G=$'\033[32m'; C=$'\033[36m'; Y=$'\033[33m'; D=$'\033[2m'; R=$'\033[0m'
@@ -49,7 +51,7 @@ note "those backends at configure time."
 
 sudo apt-get update -qq
 sudo apt-get install -y -qq \
-    build-essential cmake ninja-build curl ca-certificates \
+    build-essential cmake ninja-build curl ca-certificates patch \
     mingw-w64 \
     libasound2-dev libpulse-dev libpipewire-0.3-dev
 
@@ -75,6 +77,19 @@ else
     curl -fsSL -o "openal-soft-${OPENAL_VERSION}.tar.gz" "$TARBALL_URL"
     tar xf "openal-soft-${OPENAL_VERSION}.tar.gz"
     note "Extracted to $SRC_DIR"
+fi
+
+# Bake [general] defaults (channels=mono, frequency=44100, resampler=point)
+# into the DLL so the runtime doesn't need an alsoft.ini next to the binary.
+# Marker file makes this idempotent across re-runs that reuse $SRC_DIR.
+PATCH_MARKER="$SRC_DIR/.rombadil-defaults-patched"
+if [[ ! -f "$PATCH_MARKER" ]]; then
+    note "Applying $PATCH_FILE..."
+    ( cd "$SRC_DIR" && patch -p1 < "$PATCH_FILE" )
+    touch "$PATCH_MARKER"
+    ok "Patch applied."
+else
+    note "Patch already applied to $SRC_DIR — skipping."
 fi
 ok "Source ready."
 

@@ -1,0 +1,44 @@
+diff --git a/alc/alconfig.cpp b/alc/alconfig.cpp
+index 986b215..deac44c 100644
+--- a/alc/alconfig.cpp
++++ b/alc/alconfig.cpp
+@@ -337,6 +337,17 @@ void LoadConfigFromFile(std::istream &f)
+     ConfOpts.shrink_to_fit();
+ }
+ 
++/* Rombadil: seed [general] defaults so the DLL works without a runtime
++ * alsoft.ini / alsoft.conf. Called at the start of ReadALConfig, so any
++ * value loaded from a config file afterwards overrides these.
++ */
++static void SetDefaultConfigEntry(std::string key, std::string value)
++{
++    const auto ent = std::ranges::find(ConfOpts, key, &ConfigEntry::key);
++    if(ent == ConfOpts.end())
++        ConfOpts.emplace_back(std::move(key), std::move(value));
++}
++
+ auto GetConfigValue(const std::string_view devName, const std::string_view blockName,
+     const std::string_view keyName) -> const std::string&
+ {
+@@ -376,6 +387,10 @@ auto GetConfigValue(const std::string_view devName, const std::string_view block
+ #ifdef _WIN32
+ void ReadALConfig()
+ {
++    SetDefaultConfigEntry("channels", "mono");
++    SetDefaultConfigEntry("frequency", "44100");
++    SetDefaultConfigEntry("resampler", "point");
++
+     auto path = fs::path{};
+ 
+ #if !defined(_GAMING_XBOX)
+@@ -426,6 +441,10 @@ void ReadALConfig()
+ 
+ void ReadALConfig()
+ {
++    SetDefaultConfigEntry("channels", "mono");
++    SetDefaultConfigEntry("frequency", "44100");
++    SetDefaultConfigEntry("resampler", "point");
++
+     auto path = fs::path{"/etc/openal/alsoft.conf"};
+ 
+     TRACE("Loading config {}...", al::u8_as_char(path.u8string()));
